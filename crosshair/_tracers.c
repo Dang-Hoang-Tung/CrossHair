@@ -860,7 +860,12 @@ TraceSwapType = {
 
 
 static PyObject **crosshair_tracers_stack_lookup(PyFrameObject *frame, int index) {
-#if PY_VERSION_HEX >= 0x030C0000
+#if PY_VERSION_HEX >= 0x030E0000
+    // Python 3.14+
+    PyCodeObject* code = _PyFrame_GetCodeBorrow(frame);
+    _PyInterpreterFrame* interpreterFrame = frame->f_frame;
+    return &(interpreterFrame->stackpointer[index]);
+#elif PY_VERSION_HEX >= 0x030C0000
     // Python 3.12
     PyCodeObject* code = _PyFrame_GetCodeBorrow(frame);
     _PyInterpreterFrame* interpreterFrame = frame->f_frame;
@@ -900,7 +905,7 @@ static PyObject *crosshair_tracers_stack_read(PyObject *self, PyObject *args)
         return NULL;
     }
     PyObject *ret = *retaddr;
-    if (ret == NULL) {
+    if (ret == NULL || ret == 1) {  // starting in 3.14, we sometimes see a sentinal 0x1 pointer (?)
         PyErr_SetString(PyExc_ValueError, "No stack value is present");
         return NULL;
     } else {

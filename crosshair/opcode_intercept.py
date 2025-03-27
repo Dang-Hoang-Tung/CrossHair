@@ -29,7 +29,7 @@ from crosshair.tracers import (
 from crosshair.util import CrossHairInternal, CrossHairValue
 from crosshair.z3util import z3Not, z3Or
 
-BINARY_SUBSCR = dis.opmap["BINARY_SUBSCR"]
+BINARY_SUBSCR = dis.opmap.get("BINARY_SUBSCR", 256)
 BINARY_SLICE = dis.opmap.get("BINARY_SLICE", 256)
 BUILD_STRING = dis.opmap["BUILD_STRING"]
 COMPARE_OP = dis.opmap["COMPARE_OP"]
@@ -61,11 +61,17 @@ _DEEPLY_CONCRETE_KEY_TYPES = (
 
 
 class SymbolicSubscriptInterceptor(TracingModule):
-    opcodes_wanted = frozenset([BINARY_SUBSCR])
+    opcodes_wanted = frozenset([BINARY_SUBSCR, BINARY_OP])
 
     def trace_op(self, frame, codeobj, codenum):
         # Note that because this is called from inside a Python trace handler, tracing
         # is automatically disabled, so there's no need for a `with NoTracing():` guard.
+
+        if codenum == BINARY_OP:
+            oparg = frame_op_arg(frame)
+            if oparg != 26:  # subscript operator, NB_SUBSCR
+                return
+
         key = frame_stack_read(frame, -1)
         if isinstance(key, _DEEPLY_CONCRETE_KEY_TYPES):
             return
@@ -467,7 +473,7 @@ class ModuloInterceptor(TracingModule):
         if isinstance(left, str):
             if codenum == BINARY_OP:
                 oparg = frame_op_arg(frame)
-                if oparg != 6:  # modulo operator (determined experimentally)
+                if oparg != 6:  # modulo operator, NB_REMAINDER
                     return
             frame_stack_write(frame, -2, DeoptimizedPercentFormattingStr(left))
 
